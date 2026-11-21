@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>homesched: household-aware chore plan</title>
+<style>
+  :root { --bg:#f7f6f3; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e4e2dc; --accent:#2f6f5e; --away:#dfe9e5; --call:#f3d9c9; --quiet:#e7e5f1; --warn:#a4452c; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system, "Segoe UI", Inter, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:20px 28px 8px; }
+  h1 { font-size:20px; margin:0 0 2px; }
+  .sub { color:var(--muted); }
+  main { padding:8px 28px 28px; display:grid; gap:16px; grid-template-columns: 1fr 340px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px; }
+  svg text { font-size:11px; fill:var(--muted); }
+  svg .lab { fill:var(--ink); font-size:12px; }
+  svg .chore { fill:#fff; font-size:11px; }
+  table { width:100%; border-collapse:collapse; }
+  td, th { text-align:left; padding:6px 6px; border-top:1px solid var(--line); vertical-align:top; }
+  th { font-weight:600; color:var(--muted); font-size:12px; border-top:none; }
+  .why { color:var(--muted); font-size:12px; }
+  form { display:grid; gap:8px; grid-template-columns: 1fr 1fr; }
+  form label { display:grid; gap:3px; font-size:12px; color:var(--muted); }
+  form .full { grid-column: 1 / -1; }
+  input, select, button { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { background:var(--accent); color:#fff; border-color:var(--accent); cursor:pointer; }
+  button.secondary { background:#fff; color:var(--ink); border-color:var(--line); }
+  .changes li { margin:4px 0; }
+  .unsched { color:var(--warn); }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--muted); margin-top:8px; flex-wrap:wrap; }
+  .sw { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px; margin-right:5px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Household plan</h1>
+  <div class="sub" id="subtitle"></div>
+</header>
+<main>
+  <section>
+    <div class="card">
+      <h2>Day timeline</h2>
+      <svg id="timeline" width="100%" height="10"></svg>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--away)"></span>Out of the house</span>
+        <span><span class="sw" style="background:var(--call)"></span>On a call at home</span>
+        <span><span class="sw" style="background:var(--quiet)"></span>Quiet hours</span>
+        <span><span class="sw" style="background:var(--accent)"></span>Robot working</span>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2>Schedule and reasons</h2>
+      <table id="plan"></table>
+      <div id="unscheduled"></div>
+    </div>
+  </section>
+  <aside>
+    <div class="card">
+      <h2>What if the calendar changes?</h2>
+      <form id="ev">
+        <label>Member<select name="member" id="member"></select></label>
+        <label>Kind<select name="kind">
+          <option value="meeting">Call at home</option>
+          <option value="away">Out of the house</option>
+          <option value="focus">Busy in a room</option>
+        </select></label>
+        <label>Start<input name="start" type="time" value="08:00" required /></label>
+        <label>End<input name="end" type="time" value="08:45" required /></label>
+        <label class="full">Title<input name="title" value="Early client call" required /></label>
+        <label class="full">Room (for calls or focus)<select name="room" id="room"><option value="">none</option></select></label>
+        <button type="submit">Add event and replan</button>
+        <button type="button" class="secondary" id="reset">Reset</button>
+      </form>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2>What changed</h2>
+      <ul class="changes" id="changes"><li class="why">Add an event to see how the plan adapts.</li></ul>
+    </div>
+  </aside>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const hm = (iso) => iso.slice(11, 16);
+let data = null;
+
+async function load(url = "/api/plan", opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) { alert(await r.text()); return; }
+  data = await r.json();
+  render();
+}
+
+function render() {
+  const h = data.household, p = data.plan;
+  $("title").textContent = h.name;
+  const d = new Date(h.day + "T12:00:00");
+  $("subtitle").textContent = d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) +
+    ` - ${p.assignments.length} chores scheduled, ${p.unscheduled.length} not scheduled`;
+  if (!$("member").options.length) {
+    for (const m of h.members) $("member").add(new Option(m.name, m.name));
+    for (const r of h.rooms) $("room").add(new Option(r, r));
+  }
+  drawTimeline();
+  $("plan").innerHTML = "<tr><th>Time</th><th>Chore</th><th>Room</th><th>Battery</th></tr>" +
+    p.assignments.map(a => `<tr><td>${hm(a.start)}-${hm(a.end)}</td><td>${a.chore_name}<div class="why">${a.reasons.join("; ")}</div></td><td>${a.room}</td><td>${Math.round(a.battery_after_min)} min</td></tr>`).join("");
+  $("unscheduled").innerHTML = p.unscheduled.length
+    ? "<h2 style='margin-top:14px'>Not scheduled</h2>" + p.unscheduled.map(u => `<div class="unsched">${u.chore_name}: <span class="why">${u.reason}</span></div>`).join("")
+    : "";
+  if (data.changes) {
+    $("changes").innerHTML = data.changes.length ? data.changes.map(c => `<li>${c}</li>`).join("") : "<li class='why'>No chores had to move.</li>";
+  }
+}
+
+function drawTimeline() {
+  const svg = $("timeline"), h = data.household, slots = data.slots;
+  const W = svg.clientWidth || 800, left = 110, right = 12, rowH = 26, top = 22;
+  const rows = [...h.members.map(m => m.name), "Robot"];
+  const H = top + rows.length * rowH + 8;
+  svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const t0 = new Date(slots[0].start).getTime();
+  const t1 = new Date(slots[slots.length - 1].start).getTime() + 5 * 60000;
+  const x = (iso) => left + (new Date(iso).getTime() - t0) / (t1 - t0) * (W - left - right);
+  const slotW = (W - left - right) / slots.length;
+  let s = "";
+  slots.forEach((sl, i) => {
+    if (sl.quiet) s += `<rect x="${left + i * slotW}" y="${top - 4}" width="${slotW + .5}" height="${rows.length * rowH}" fill="var(--quiet)"/>`;
+  });
+  for (let hr = 6; hr <= 23; hr += 2) {
+    const iso = `${h.day}T${String(hr).padStart(2, "0")}:00:00`;
+    const xx = x(iso);
+    s += `<line x1="${xx}" x2="${xx}" y1="${top - 6}" y2="${H - 6}" stroke="var(--line)"/><text x="${xx}" y="12" text-anchor="middle">${String(hr).padStart(2, "0")}:00</text>`;
+  }
+  rows.forEach((name, r) => {
+    const y = top + r * rowH;
+    s += `<text class="lab" x="8" y="${y + 15}">${name}</text>`;
+    if (name === "Robot") return;
+    slots.forEach((sl, i) => {
+      const home = sl.home.includes(name);
+      const call = sl.on_call.includes(name);
+      if (!home) s += `<rect x="${left + i * slotW}" y="${y}" width="${slotW + .5}" height="${rowH - 6}" fill="var(--away)"/>`;
+      else if (call) s += `<rect x="${left + i * slotW}" y="${y}" width="${slotW + .5}" height="${rowH - 6}" fill="var(--call)"/>`;
+    });
+  });
+  const ry = top + (rows.length - 1) * rowH;
+  for (const a of data.plan.assignments) {
+    const x0 = x(a.start), x1 = x(a.end);
+    s += `<rect x="${x0}" y="${ry}" width="${Math.max(2, x1 - x0)}" height="${rowH - 6}" rx="3" fill="var(--accent)"><title>${a.chore_name} (${hm(a.start)}-${hm(a.end)})</title></rect>`;
+  }
+  svg.innerHTML = s;
+}
+
+$("ev").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target), day = data.household.day;
+  const event = {
+    member: f.get("member"), kind: f.get("kind"), title: f.get("title"),
+    start: `${day}T${f.get("start")}`, end: `${day}T${f.get("end")}`, room: f.get("room") || null,
+  };
+  load("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event }) });
+});
+$("reset").addEventListener("click", () => { load("/api/reset", { method: "POST" }).then(() => { $("changes").innerHTML = "<li class='why'>Add an event to see how the plan adapts.</li>"; }); });
+window.addEventListener("resize", () => data && drawTimeline());
+load();
+</script>
+</body>
+</html>

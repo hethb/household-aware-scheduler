@@ -1,0 +1,53 @@
+{
+  "name": "Example household",
+  "timezone": "America/New_York",
+  "day": "2026-11-23",
+  "day_start": "06:00",
+  "day_end": "23:00",
+  "quiet_start": "21:30",
+  "quiet_end": "07:30",
+  "rooms": ["living room", "kitchen", "primary bedroom", "kids room", "office", "laundry"],
+  "members": [
+    {
+      "name": "Priya",
+      "default_room": "living room",
+      "rules": [
+        { "room": "primary bedroom", "start": "22:30", "end": "06:45" },
+        { "room": "office", "start": "08:30", "end": "16:30" }
+      ]
+    },
+    {
+      "name": "Sam",
+      "default_room": "living room",
+      "rules": [
+        { "room": "primary bedroom", "start": "22:30", "end": "06:45" },
+        { "room": "kitchen", "start": "06:45", "end": "07:30" }
+      ]
+    },
+    {
+      "name": "Maya",
+      "default_room": "kids room",
+      "rules": [{ "room": "kitchen", "start": "07:00", "end": "07:40" }]
+    }
+  ],
+  "events": [
+    { "member": "Sam", "title": "Work (office)", "start": "2026-11-23T07:45", "end": "2026-11-23T17:30", "kind": "away" },
+    { "member": "Maya", "title": "School", "start": "2026-11-23T08:00", "end": "2026-11-23T15:15", "kind": "away" },
+    { "member": "Maya", "title": "Swim practice", "start": "2026-11-23T16:30", "end": "2026-11-23T18:00", "kind": "away" },
+    { "member": "Priya", "title": "Team standup", "start": "2026-11-23T09:00", "end": "2026-11-23T09:30", "kind": "meeting", "room": "office" },
+    { "member": "Priya", "title": "Design review", "start": "2026-11-23T11:00", "end": "2026-11-23T12:00", "kind": "meeting", "room": "office" },
+    { "member": "Priya", "title": "Customer call", "start": "2026-11-23T14:00", "end": "2026-11-23T14:45", "kind": "meeting", "room": "office" },
+    { "member": "Priya", "title": "Gym and school pickup", "start": "2026-11-23T16:30", "end": "2026-11-23T18:05", "kind": "away" }
+  ],
+  "chores": [
+    { "id": "unload_dryer", "name": "Unload dryer", "room": "laundry", "duration_min": 10, "earliest": "07:30", "deadline": "12:00", "priority": 3 },
+    { "id": "fold_laundry", "name": "Fold laundry", "room": "primary bedroom", "duration_min": 35, "earliest": "07:30", "deadline": "21:00", "priority": 3, "after": ["unload_dryer"] },
+    { "id": "bed_primary", "name": "Make primary bed", "room": "primary bedroom", "duration_min": 15, "earliest": "07:00", "deadline": "12:00", "priority": 2 },
+    { "id": "bed_kids", "name": "Make kids bed", "room": "kids room", "duration_min": 10, "earliest": "08:00", "deadline": "15:00", "priority": 2 },
+    { "id": "dishwasher", "name": "Unload dishwasher", "room": "kitchen", "duration_min": 20, "earliest": "07:30", "deadline": "16:00", "priority": 2, "noise": "loud" },
+    { "id": "tidy_living", "name": "Tidy living room", "room": "living room", "duration_min": 25, "earliest": "08:00", "deadline": "17:00", "priority": 2 },
+    { "id": "fold_towels", "name": "Fold towels", "room": "laundry", "duration_min": 20, "earliest": "07:30", "deadline": "20:00", "priority": 1, "after": ["unload_dryer"] },
+    { "id": "tidy_office", "name": "Tidy office", "room": "office", "duration_min": 15, "earliest": "08:00", "deadline": "20:00", "priority": 1 }
+  ],
+  "robot": { "name": "robot", "dock_room": "living room", "battery_work_min": 90, "charge_rate": 0.5, "travel_min": 3 }
+}
